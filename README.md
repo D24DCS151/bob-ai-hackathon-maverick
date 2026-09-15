@@ -22,36 +22,143 @@ Multi-source threat correlation, MITRE ATT&CK mapping, mission-aware risk scorin
 
 ## Table of Contents
 
-1. [Mission](#mission)
-2. [Operational Capability Matrix](#operational-capability-matrix)
-3. [Architecture Overview](#architecture-overview)
-4. [Data Flow](#data-flow)
-5. [Module Map](#module-map)
-6. [Quick Start — Local Development](#quick-start--local-development)
-7. [Running with Docker](#running-with-docker)
-8. [API Reference](#api-reference)
-9. [Configuration Reference](#configuration-reference)
-10. [MITRE ATT&CK Knowledge Base](#mitre-attck-knowledge-base)
-11. [Sample Data & Demo Scenario](#sample-data--demo-scenario)
-12. [Testing](#testing)
-13. [Extension Points](#extension-points)
-14. [Security & Operational Considerations](#security--operational-considerations)
-15. [Kubernetes Deployment](#kubernetes-deployment)
-16. [Roadmap](#roadmap)
-17. [Development & Contributing](#development--contributing)
-18. [Team](#team)
+1. [Team](#team)
+2. [Problem Statement](#problem-statement)
+3. [Solution](#solution)
+4. [Key Features](#key-features)
+5. [Tech Stack](#tech-stack)
+6. [How to Run](#how-to-run)
+7. [Demo](#demo)
+8. [Known Limitations](#known-limitations)
+9. [What We're Most Proud Of](#what-were-most-proud-of)
+10. [Operational Context](#operational-context)
+11. [Operational Capability Matrix](#operational-capability-matrix)
+12. [Architecture Overview](#architecture-overview)
+13. [Data Flow](#data-flow)
+14. [Module Map](#module-map)
+15. [Quick Start — Local Development](#quick-start--local-development)
+16. [Running with Docker](#running-with-docker)
+17. [API Reference](#api-reference)
+18. [Configuration Reference](#configuration-reference)
+19. [MITRE ATT&CK Knowledge Base](#mitre-attck-knowledge-base)
+20. [Sample Data & Demo Scenario](#sample-data--demo-scenario)
+21. [Testing](#testing)
+22. [Extension Points](#extension-points)
+23. [Security & Operational Considerations](#security--operational-considerations)
+24. [Kubernetes Deployment](#kubernetes-deployment)
+25. [Roadmap](#roadmap)
+26. [Development & Contributing](#development--contributing)
 
 ---
 
-## Mission
+## Team
 
-Modern SOCs — national, military, and coalition — are saturated with alerts arriving from disconnected sensors: SIEM platforms, EDR agents, satellite and ISR feeds, HUMINT and SIGINT reporting, and STIX/TAXII intelligence exchanges. Analysts spend the majority of their time triaging this volume rather than acting on it, and a critical alert hitting a live command-and-control (C2) asset can be indistinguishable from noise hitting an idle workstation — unless the system understands the mission context in which it is operating.
+### Team Maverick
 
-**THREATICAP exists to close that gap.**
+| Field | Detail |
+|---|---|
+| **Track** | [Add track — AI / DevOps / Sustainability / Open] |
+| **Team Lead** | [Add lead name & email] |
 
-It ingests alerts from heterogeneous sources, correlates related activity into coherent threats, maps observed behaviour to MITRE ATT&CK, applies an explainable and mission-aware risk score, and produces a structured **BLUF (Bottom Line Up Front)** report tailored to the reader — commander, watch officer, or analyst — so that the right decision reaches the right person in seconds, not hours.
+| Enrollment No. | Name |
+|---|---|
+| D24DCS151 | Vatsal Sapovadiya |
+| D24DCS150 | Pratham Jadwani |
+| D24DCS159 | Krunal Mistry |
+| D24DCS156 | Hitanshu Varia |
 
-Every scoring decision, correlation, and report is written to an immutable audit trail. Every threshold, weight, and connector is configuration-driven. Nothing in the scoring or correlation logic is hard-coded, and every output is explainable back to its source evidence — a requirement for any system intended to inform command decisions.
+---
+
+## Problem Statement
+
+National and coalition SOC analysts are overwhelmed by alert volume arriving from disconnected SIEM, EDR, satellite/ISR, HUMINT/SIGINT, and STIX/TAXII feeds, and spend the majority of their time triaging noise rather than acting on genuine threats. Existing tooling scores every alert identically regardless of the mission underway, so a high-severity alert hitting a live command-and-control (C2) asset can look no different from one hitting an idle workstation — and by the time the real threat surfaces, the window for effective response has narrowed.
+
+---
+
+## Solution
+
+THREATICAP ingests alerts from all of these sources into a single correlation pipeline, clusters related activity into coherent threats, maps observed behaviour to MITRE ATT&CK, and applies an explainable, mission-aware risk score. The output is a structured **BLUF (Bottom Line Up Front)** report — tailored to a commander, watch officer, or analyst — stating the bottom line, the supporting evidence, and the recommended action, with every decision traceable through an immutable audit trail.
+
+---
+
+## Key Features
+
+- **Multi-source ingestion** — dedicated connectors for SIEM (JSON/CEF/LEEF), EDR/network telemetry, HUMINT/SIGINT/OSINT reporting, and STIX 2.1/TAXII 2.1 feeds
+- **Correlation engine** — IOC, temporal, asset, and behavioural/MITRE matching unified through Union-Find clustering
+- **MITRE ATT&CK enrichment** — technique, sub-technique, and tactic mapping from a configurable YAML knowledge base
+- **Explainable, mission-aware risk scoring** — a 5-factor weighted model with configurable CRITICAL/HIGH/MEDIUM/LOW tiers
+- **Role-specific BLUF report generation** — commander, watch officer, and analyst formats, served over a fully OpenAPI-documented REST API
+- **Immutable audit trail** — every correlation decision, score, and report is permanently and traceably logged
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Language** | Python 3.11+ |
+| **API framework** | FastAPI (OpenAPI-documented) |
+| **Data validation** | Pydantic v2 |
+| **CLI** | Click |
+| **Containerisation** | Docker, Docker Compose |
+| **Horizontal-scale datastore path** | PostgreSQL, Redis |
+| **Threat intel standards** | STIX 2.1 / TAXII 2.1, MITRE ATT&CK |
+| **Testing** | pytest, pytest-cov |
+| **IBM technology** | IBM Bob |
+
+**IBM Bob integration:** IBM Bob was used as the AI development agent for this codebase — analysing the existing architecture, designing the module structure, generating and testing the correlation/scoring/reporting layers, and producing this documentation within agent sessions. [Add any additional runtime integration of Bob/watsonx here if applicable to your build.]
+
+---
+
+## How to Run
+
+```bash
+# Clone and install
+git clone https://github.com/defence-org/threaticap.git
+cd threaticap
+pip install -e ".[dev]"
+
+# Run the end-to-end demo (no server required)
+python -m threaticap demo --data-dir data/sample
+
+# Or start the API server
+python -m threaticap serve --host 0.0.0.0 --port 8080
+# API docs: http://localhost:8080/api/v1/docs
+```
+
+For the containerised path, see [Running with Docker](#running-with-docker). Full environment variables and prerequisites are documented in `docs/setup-guide.md`.
+
+---
+
+## Demo
+
+| Artifact | Link |
+|---|---|
+| **Demo video** | [Add link — see `demo/demo-video-link.txt`] |
+| **Live demo** | [Add URL, or `NOT DEPLOYED` — see `demo/live-demo-url.txt`] |
+| **Screenshots** | See `demo/screenshots/` (application walkthrough) |
+
+---
+
+## Known Limitations
+
+- Default storage and deduplication cache are in-memory; the PostgreSQL and Redis backends are implemented as extension points (see [Extension Points](#extension-points)) but are not wired in by default.
+- The bundled MITRE ATT&CK knowledge base (`config/mitre_attack_kb.yaml`) is a maintainable sample set, not the full official STIX bundle — production use should point `mitre.stix_bundle_path` to the official MITRE CTI release.
+- False-positive filtering is heuristic. The `MLFalsePositiveFilter` interface described under Extension Points is a defined extension point, not a trained model shipped with this submission.
+- Authentication and authorisation are not implemented on the REST API in this submission; production deployment should sit behind the reverse-proxy/mTLS layer described in [Security & Operational Considerations](#security--operational-considerations).
+- Sample data represents a single simulated APT campaign; validation against live, real-world feeds has not yet been performed.
+
+---
+
+## What We're Most Proud Of
+
+Every scoring weight, correlation threshold, and connector in THREATICAP is configuration-driven rather than hard-coded — nothing in the risk logic requires a code change to be re-tuned for a different mission or environment. Paired with the immutable audit trail, this means a CRITICAL rating is never a black box: a commander can trace exactly which evidence, weights, and thresholds produced it. That explainability — built for real command decision-making rather than detection alone — is the part of the system we consider its strongest contribution.
+
+---
+
+## Operational Context
+
+Modern SOCs — national, military, and coalition — operate across disconnected sensors with no shared understanding of mission priority. THREATICAP is built specifically to close that gap: it does not just detect and correlate, it reasons about mission context, propagates classification correctly (TLP, NOFORN, REL TO), and produces output formatted for the person who has to act on it — not just the analyst who found it. Every threshold, weight, and connector is configuration-driven, and every output is explainable back to its source evidence, which is a baseline requirement for any system intended to inform command decisions.
 
 ---
 
@@ -626,22 +733,10 @@ black threaticap/ tests/
 
 ---
 
-## Team
-
-### Team Maverick
-
-| Enrollment No. | Name |
-|---|---|
-| D24DCS151 | Vatsal Sapovadiya |
-| D24DCS150 | Pratham Jadwani |
-| D24DCS159 | Krunal Mistry |
-| D24DCS156 | Hitanshu Varia |
-
----
-
+<div align="center">
 
 **THREATICAP — designed for hardening into live defence environments.**
 
 *From sensor noise to command decision.*
 
-</div>
+</div>this is the readme file, i want you to modify it according to the project. and make sure to follow the proper format as given
