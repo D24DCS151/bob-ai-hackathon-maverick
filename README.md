@@ -114,7 +114,7 @@ THREATICAP ingests alerts from all of these sources into a single correlation pi
 
 ```bash
 # Clone and install
-git clone https://github.com/defence-org/threaticap.git
+git clone https://github.com/D24DCS151/bob-ai-hackathon-maverick.git
 cd threaticap
 pip install -e ".[dev]"
 
