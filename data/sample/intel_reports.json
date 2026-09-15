@@ -1,0 +1,39 @@
+[
+  {
+    "report_id": "HUMINT-2024-0114-001",
+    "title": "HUMINT Report: Advance Warning of Targeted Intrusion Campaign",
+    "subject": "Targeted cyber intrusion against defence contractor network — imminent threat",
+    "report_type": "HUMINT",
+    "source_subtype": "humint",
+    "date": "2024-01-14T18:00:00Z",
+    "severity": "high",
+    "confidence": 0.72,
+    "tlp": "TLP:RED",
+    "threat_actor": "APT-X",
+    "campaign": "OP-PHANTOM-2024",
+    "tags": ["nation-state", "defence-contractor", "cyber-espionage"],
+    "body": "A reliable source with direct access reported that a nation-state affiliated threat group known as APT-X is planning a targeted spearphishing campaign against defence contractors in the region, expected to commence within 24-48 hours. The group is known to use encoded PowerShell payloads delivered via weaponised Office documents. Target IP ranges include the 10.0.0.0/16 subnet. C2 infrastructure has been established at 203.0.113.45 and the domain c2.phantom-op.xyz. The campaign, designated OP-PHANTOM-2024, focuses on credential harvesting and intellectual property exfiltration. Indicators: IP 203.0.113.45, hash 92a4ccf36f4d0b44e58d2c0c4e5b1234, domain c2.phantom-op.xyz.",
+    "ip_addresses": ["203.0.113.45"],
+    "domains": ["c2.phantom-op.xyz"],
+    "file_hashes": ["92a4ccf36f4d0b44e58d2c0c4e5b1234"],
+    "mitre_technique_ids": ["T1566.001", "T1059.001", "T1041"],
+    "target_network": "CORP-MGMT"
+  },
+  {
+    "report_id": "OSINT-2024-0115-001",
+    "title": "OSINT: C2 Infrastructure Analysis — APT-X Campaign",
+    "report_type": "OSINT",
+    "source_subtype": "osint",
+    "date": "2024-01-15T06:30:00Z",
+    "severity": "medium",
+    "confidence": 0.65,
+    "tlp": "TLP:GREEN",
+    "threat_actor": "APT-X",
+    "campaign": "OP-PHANTOM-2024",
+    "body": "Open source analysis of IP 203.0.113.45 identifies it as associated with APT-X infrastructure based on certificate reuse, hosting patterns, and passive DNS analysis. The domain c2.phantom-op.xyz was registered on 2024-01-12 via a privacy-protected registrar. The ASN hosting this IP has previously hosted APT-X C2 nodes. Recommend blocking at perimeter immediately.",
+    "ip_addresses": ["203.0.113.45"],
+    "domains": ["c2.phantom-op.xyz"],
+    "mitre_technique_ids": ["T1071.001", "T1105"],
+    "urls": ["http://203.0.113.45/stage2.exe", "https://c2.phantom-op.xyz/beacon"]
+  }
+]

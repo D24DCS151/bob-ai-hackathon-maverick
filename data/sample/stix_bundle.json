@@ -1,0 +1,98 @@
+{
+  "type": "bundle",
+  "id": "bundle--threaticap-sample-001",
+  "spec_version": "2.1",
+  "objects": [
+    {
+      "type": "indicator",
+      "id": "indicator--phantom-c2-ip",
+      "spec_version": "2.1",
+      "name": "APT-X C2 IP Address",
+      "description": "Known C2 IP address associated with APT-X OP-PHANTOM-2024 campaign",
+      "pattern": "[ipv4-addr:value = '203.0.113.45']",
+      "pattern_type": "stix",
+      "valid_from": "2024-01-12T00:00:00Z",
+      "created": "2024-01-13T12:00:00Z",
+      "confidence": 90,
+      "labels": ["malicious-activity", "c2"],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1071.001"
+        }
+      ],
+      "object_marking_refs": [
+        "marking-definition--34098fce-860f-48ae-8e50-ebd3cc5e41da"
+      ]
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--phantom-c2-domain",
+      "spec_version": "2.1",
+      "name": "APT-X C2 Domain",
+      "description": "C2 domain used in APT-X OP-PHANTOM-2024 phishing campaign",
+      "pattern": "[domain-name:value = 'c2.phantom-op.xyz']",
+      "pattern_type": "stix",
+      "valid_from": "2024-01-12T00:00:00Z",
+      "created": "2024-01-13T14:00:00Z",
+      "confidence": 85,
+      "labels": ["malicious-activity", "c2", "phishing"],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1566.001"
+        }
+      ],
+      "object_marking_refs": [
+        "marking-definition--34098fce-860f-48ae-8e50-ebd3cc5e41da"
+      ]
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--phantom-malware-hash",
+      "spec_version": "2.1",
+      "name": "APT-X Credential Dumper Hash",
+      "description": "SHA256 hash of credential dumping tool used in APT-X campaign",
+      "pattern": "[file:hashes.SHA256 = 'aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899']",
+      "pattern_type": "stix",
+      "valid_from": "2024-01-10T00:00:00Z",
+      "created": "2024-01-10T08:00:00Z",
+      "confidence": 95,
+      "labels": ["malicious-activity", "credential-access"],
+      "external_references": [
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1003"
+        }
+      ],
+      "object_marking_refs": [
+        "marking-definition--34098fce-860f-48ae-8e50-ebd3cc5e41da"
+      ]
+    },
+    {
+      "type": "threat-actor",
+      "id": "threat-actor--apt-x",
+      "spec_version": "2.1",
+      "name": "APT-X",
+      "description": "Nation-state affiliated threat group known for cyber-espionage against defence and government organisations. Uses spearphishing and PowerShell-based payloads.",
+      "threat_actor_types": ["nation-state"],
+      "created": "2023-06-01T00:00:00Z",
+      "confidence": 80,
+      "object_marking_refs": [
+        "marking-definition--34098fce-860f-48ae-8e50-ebd3cc5e41da"
+      ]
+    },
+    {
+      "type": "campaign",
+      "id": "campaign--op-phantom-2024",
+      "spec_version": "2.1",
+      "name": "OP-PHANTOM-2024",
+      "description": "Targeted cyber-espionage campaign against defence contractors. Employs spearphishing with encoded PowerShell payloads, credential dumping, and C2 beaconing.",
+      "created": "2024-01-12T00:00:00Z",
+      "confidence": 75,
+      "object_marking_refs": [
+        "marking-definition--34098fce-860f-48ae-8e50-ebd3cc5e41da"
+      ]
+    }
+  ]
+}

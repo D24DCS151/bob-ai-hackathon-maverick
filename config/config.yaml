@@ -1,0 +1,276 @@
+# THREATICAP Configuration — Phase 2 Production
+# All thresholds and parameters are configurable here.
+# No hard-coded values exist in the codebase.
+#
+# Environment variable overrides (take precedence over this file):
+#   THREATICAP_CONFIG=config/config.yaml
+#   LOG_LEVEL=INFO
+#   JSON_LOGS=false
+#   POSTGRES_DSN=postgresql://user:pass@host:5432/threaticap
+#   REDIS_URL=redis://host:6379/0
+#   THREATICAP_MASTER_KEY=<random-256-bit-hex>
+#   JWT_SECRET_KEY=<random-256-bit-hex>
+#   THREATICAP_AUTH_DISABLED=false   # NEVER true in production
+
+# ---------------------------------------------------------------------------
+# Correlation Engine
+# ---------------------------------------------------------------------------
+correlation:
+  ioc_enabled: true
+  temporal_enabled: true
+  asset_enabled: true
+  behaviour_enabled: true
+  graph_enabled: true           # Enable NetworkX graph correlation (Phase 2)
+
+  # Time window for temporal correlation (seconds)
+  temporal_window_seconds: 3600
+
+  # Minimum confidence to form a correlated group
+  # Pairs below this threshold remain as singletons
+  min_group_confidence: 0.30
+
+  # Singleton alerts (no peers) receive this base confidence
+  singleton_confidence: 0.20
+
+  # Graph correlation — centrality boost applied to hub alerts
+  # Set 0.0 to disable centrality-based priority boost
+  graph_centrality_boost_max: 0.15
+
+  # Whitelist: IPs/hostnames/domains known to generate benign alerts
+  # Format: plain strings, CIDR notation NOT supported (use asset_registry)
+  whitelist_ips: []
+  whitelist_hostnames: []
+  whitelist_domains: []
+
+  # Configuration version — recorded in every audit trail entry
+  config_version: "2.0"
+
+
+# ---------------------------------------------------------------------------
+# Scoring / Prioritisation
+# ---------------------------------------------------------------------------
+scoring:
+  weights:
+    # Must sum to exactly 1.0
+    severity: 0.30
+    confidence: 0.25
+    source_reliability: 0.15
+    asset_criticality: 0.20
+    temporal_urgency: 0.10
+
+  thresholds:
+    # Score boundaries for priority tier assignment (0–100 scale)
+    critical: 80.0
+    high: 60.0
+    medium: 35.0
+    # Below medium threshold → LOW
+    config_name: "default-v2"
+
+  # Temporal urgency decay: alerts older than this receive urgency=0
+  urgency_max_age_hours: 72.0
+
+  # Severity raw values (0–100 scale input for scoring)
+  severity_values:
+    CRITICAL: 100.0
+    HIGH: 75.0
+    MEDIUM: 50.0
+    LOW: 25.0
+    INFO: 10.0
+
+
+# ---------------------------------------------------------------------------
+# MITRE ATT&CK
+# ---------------------------------------------------------------------------
+mitre:
+  knowledge_base_path: "config/mitre_attack_kb.yaml"
+  # Uncomment to load the official MITRE ATT&CK STIX bundle in production.
+  # Download from: https://github.com/mitre/cti/blob/master/enterprise-attack/enterprise-attack.json
+  # The YAML KB is used as an override / supplement on top of the STIX bundle.
+  # stix_bundle_path: "config/enterprise-attack.json"
+
+
+# ---------------------------------------------------------------------------
+# Ingestion
+# ---------------------------------------------------------------------------
+ingestion:
+  extract_iocs_from_text: true
+  dedup_cache_size: 50000
+  dedup_ttl_seconds: 3600
+  max_concurrent_connectors: 4
+  geoip_enabled: false
+  reputation_enabled: false
+
+
+# ---------------------------------------------------------------------------
+# Streaming (Redis Streams — Phase 2)
+# ---------------------------------------------------------------------------
+streaming:
+  # Enable the Redis Streams ingestion consumer
+  enabled: false
+
+  # Redis stream name for inbound alerts
+  stream_name: "threaticap:alerts:inbound"
+
+  # Consumer group name (multiple workers share this group for load balancing)
+  consumer_group: "threaticap-workers"
+
+  # This consumer's unique ID (set per-instance, e.g. via HOSTNAME env var)
+  # consumer_id: ""   # defaults to socket.gethostname()
+
+  # How many messages to claim from Redis per poll cycle
+  batch_size: 100
+
+  # Poll interval when no messages are available (seconds)
+  poll_interval_seconds: 1.0
+
+  # After processing, auto-acknowledge messages (set false for at-least-once with manual ACK)
+  auto_ack: true
+
+  # Pending Entry List (PEL) recovery — reclaim unacknowledged messages
+  # older than this threshold (seconds) from failed workers
+  pel_claim_min_idle_ms: 30000
+
+  # Dead-letter stream for messages that fail > max_retry_count times
+  dead_letter_stream: "threaticap:alerts:dead"
+  max_retry_count: 3
+
+
+# ---------------------------------------------------------------------------
+# Enrichment (Phase 2)
+# ---------------------------------------------------------------------------
+enrichment:
+  # Global enable/disable switch
+  enabled: false
+
+  reputation:
+    enabled: false
+    provider: "stub"       # stub | virustotal | abuseipdb | misp
+    # api_key: ""          # Set via REPUTATION_API_KEY env var
+    ttl_seconds: 1800
+    circuit_failure_threshold: 5
+    circuit_reset_timeout_seconds: 60
+
+  cmdb:
+    enabled: false
+    provider: "static"     # static | servicenow | device42
+    # cmdb_url: ""         # Set via CMDB_URL env var
+    # api_token: ""        # Set via CMDB_API_TOKEN env var
+    ttl_seconds: 3600
+    circuit_failure_threshold: 5
+    circuit_reset_timeout_seconds: 120
+
+  cve:
+    enabled: false
+    # nvd_api_key: ""      # Set via NVD_API_KEY env var (optional, rate-limited without)
+    ttl_seconds: 86400     # CVE data changes slowly
+    circuit_failure_threshold: 3
+    circuit_reset_timeout_seconds: 300
+
+
+# ---------------------------------------------------------------------------
+# Asset Registry
+# ---------------------------------------------------------------------------
+# Maps IP addresses / hostnames -> asset context for enrichment.
+# In production, replace with a CMDB API integration (enrichment.cmdb section above).
+asset_registry:
+  "10.0.1.50":
+    asset_id: "ASSET-001"
+    hostname: "dc01.corp.internal"
+    owner: "IT Operations"
+    classification: "SECRET"
+    criticality: 0.95
+    network_segment: "CORP-MGMT"
+    tags: ["domain-controller", "critical-infra"]
+  "10.0.1.51":
+    asset_id: "ASSET-002"
+    hostname: "fileserver01.corp.internal"
+    owner: "IT Operations"
+    classification: "SECRET"
+    criticality: 0.85
+    network_segment: "CORP-DATA"
+    tags: ["file-server", "sensitive-data"]
+  "10.0.2.100":
+    asset_id: "ASSET-003"
+    hostname: "workstation-alpha.corp.internal"
+    owner: "Operations Division"
+    classification: "UNCLASSIFIED"
+    criticality: 0.60
+    network_segment: "OPS-WORKSTATIONS"
+    tags: ["user-workstation"]
+  "10.0.2.101":
+    asset_id: "ASSET-004"
+    hostname: "workstation-bravo.corp.internal"
+    owner: "Operations Division"
+    classification: "UNCLASSIFIED"
+    criticality: 0.60
+    network_segment: "OPS-WORKSTATIONS"
+    tags: ["user-workstation"]
+  "10.0.3.10":
+    asset_id: "ASSET-005"
+    hostname: "c2-proxy-external"
+    owner: "UNKNOWN"
+    classification: "UNCLASSIFIED"
+    criticality: 0.10
+    network_segment: "DMZ"
+    tags: ["suspected-c2"]
+
+
+# ---------------------------------------------------------------------------
+# API
+# ---------------------------------------------------------------------------
+api:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 1
+  cors_origins: "*"
+  # In production: set to specific allowed origins and use mTLS at ingress
+  #
+  # Authentication (Phase 2):
+  #   - Set THREATICAP_MASTER_KEY to a random 256-bit hex string
+  #   - Set JWT_SECRET_KEY to a separate random 256-bit hex string
+  #   - NEVER set THREATICAP_AUTH_DISABLED=true in production
+  #
+  # Rate limiting:
+  #   Configure at the ingress/reverse-proxy layer (nginx, Envoy, AWS ALB).
+
+
+# ---------------------------------------------------------------------------
+# Storage
+# ---------------------------------------------------------------------------
+storage:
+  # backend: "memory" | "postgresql"
+  # Use "memory" for local development and testing (no persistence).
+  # Use "postgresql" for production — requires POSTGRES_DSN env var.
+  backend: "memory"
+
+  # PostgreSQL connection pool settings (used when backend=postgresql)
+  pool_min_size: 2
+  pool_max_size: 10
+  pool_connection_timeout_seconds: 30
+
+  # SQLite path for single-node air-gapped deployment (future)
+  # sqlite_path: "data/threaticap.db"
+
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  # Set JSON_LOGS=true (or json_logs: true here) for structured JSON output
+  # in production (consumed by Splunk, ELK, Loki, etc.)
+  json_logs: false
+  # log_file: "/var/log/threaticap/threaticap.log"
+
+
+# ---------------------------------------------------------------------------
+# Observability (Phase 2)
+# ---------------------------------------------------------------------------
+observability:
+  # Prometheus metrics are always collected in-process.
+  # The /api/v1/metrics/prometheus endpoint exposes them in text format.
+  # In production, configure a Prometheus scrape job against this endpoint.
+  prometheus_enabled: true
+
+  # Health check includes enricher circuit states, storage, and streaming
+  detailed_health: true

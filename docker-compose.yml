@@ -1,0 +1,175 @@
+# THREATICAP — Docker Compose (Phase 2)
+# Local multi-service development environment.
+#
+# Services:
+#   threaticap-api    — Main REST API (auth-enabled, Prometheus metrics)
+#   postgres          — PostgreSQL 16 (production-like storage backend)
+#   redis             — Redis 7 (Streams ingestion + dedup cache)
+#
+# Usage:
+#   # Start everything (memory-backed, no secrets required):
+#   docker compose up
+#
+#   # Start with PostgreSQL backend:
+#   STORAGE_BACKEND=postgresql DB_PASSWORD=securepass docker compose up
+#
+#   # Run demo CLI inside container:
+#   docker compose run --rm threaticap-api python -m threaticap demo
+#
+#   # Run tests inside container:
+#   docker compose run --rm -e THREATICAP_AUTH_DISABLED=true threaticap-api \
+#     python -m pytest tests/ -v
+#
+# Environment variables (create a .env file — never commit secrets):
+#   DB_PASSWORD          PostgreSQL password (default: change-me-in-production)
+#   REDIS_PASSWORD       Redis password       (default: change-me-in-production)
+#   THREATICAP_MASTER_KEY  Admin API key      (default: insecure dev key)
+#   JWT_SECRET_KEY       JWT signing secret   (default: insecure dev secret)
+#   LOG_LEVEL            INFO | DEBUG | WARNING
+#   JSON_LOGS            true | false
+#   STORAGE_BACKEND      memory | postgresql  (default: memory)
+
+version: "3.9"
+
+x-threaticap-common: &threaticap-common
+  image: threaticap:latest
+  build:
+    context: .
+    target: runtime
+  volumes:
+    - ./config:/app/config:ro
+    - ./data:/app/data:ro
+  networks:
+    - threaticap-net
+  restart: unless-stopped
+  # Security options: drop all capabilities, no new privileges
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+
+  # --------------------------------------------------------------------------
+  # Main API service
+  # --------------------------------------------------------------------------
+  threaticap-api:
+    <<: *threaticap-common
+    container_name: threaticap-api
+    ports:
+      - "8080:8080"
+    environment:
+      THREATICAP_CONFIG: "/app/config/config.yaml"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      JSON_LOGS: "${JSON_LOGS:-false}"
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
+      PYTHONUNBUFFERED: "1"
+
+      # Storage backend selection
+      # Override storage.backend in config.yaml or set here:
+      # STORAGE_BACKEND: "postgresql"
+
+      # Authentication — OVERRIDE THESE IN PRODUCTION
+      # Use docker secrets or a secrets manager instead of plain env vars.
+      THREATICAP_MASTER_KEY: "${THREATICAP_MASTER_KEY:-dev-master-key-insecure-replace-me}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-dev-jwt-secret-insecure-replace-me}"
+
+      # Disable auth in development only — NEVER in production
+      THREATICAP_AUTH_DISABLED: "${THREATICAP_AUTH_DISABLED:-false}"
+
+      # PostgreSQL (only used when storage backend = postgresql)
+      POSTGRES_DSN: "postgresql://threaticap:${DB_PASSWORD:-change-me-in-production}@postgres:5432/threaticap"
+
+      # Redis (streaming consumer + dedup cache)
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-change-me-in-production}@redis:6379/0"
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import httpx; httpx.get('http://localhost:8080/api/v1/health', timeout=5).raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL — production storage backend
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: threaticap-postgres
+    environment:
+      POSTGRES_DB: "threaticap"
+      POSTGRES_USER: "threaticap"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change-me-in-production}"
+      # Harden postgres configuration
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Run migrations automatically on first start
+      - ./scripts/db/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"   # Bind to loopback only — not exposed to the network
+    networks:
+      - threaticap-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U threaticap -d threaticap"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  # --------------------------------------------------------------------------
+  # Redis — Streams ingestion consumer + deduplication cache
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: threaticap-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-change-me-in-production}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --loglevel warning
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:6379:6379"   # Bind to loopback only
+    networks:
+      - threaticap-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change-me-in-production}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+# --------------------------------------------------------------------------
+# Networks — isolated bridge network, no external access by default
+# --------------------------------------------------------------------------
+networks:
+  threaticap-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# --------------------------------------------------------------------------
+# Volumes — named volumes survive container restarts
+# --------------------------------------------------------------------------
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
