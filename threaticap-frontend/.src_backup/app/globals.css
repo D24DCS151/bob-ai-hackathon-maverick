@@ -1,0 +1,92 @@
+/*
+ * THREATICAP Global Styles
+ * Defence & Aerospace themed dark mode base styles
+ */
+
+/* CSS Variables for the defense theme */
+:root {
+  --background: #0e1420;
+  --foreground: #e8edf5;
+  --card: #1a1c22;
+  --card-foreground: #e8edf5;
+  --popover: #1a1c22;
+  --popover-foreground: #e8edf5;
+  --primary: #f59e0b; /* amber-500 */
+  --primary-foreground: #1e293b;
+  --secondary: #64748b; /* muted-500 */
+  --secondary-foreground: #f1f5f9;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --accent: #06d6a0; /* cyan-500 */
+  --accent-foreground: #0e1420;
+  --destructive: #f87171; /* critical-300 */
+  --destructive-foreground: #1e293b;
+  --border: #2a3548;
+  --input: #3a4a60;
+  --ring: #06d6a0;
+}
+
+.dark {
+  --background: #0e1420;
+  --foreground: #e8edf5;
+  --card: #1a1c22;
+  --card-foreground: #e8edf5;
+  --popover: #1a1c22;
+  --popover-foreground: #e8edf5;
+  --primary: #f59e0b;
+  --primary-foreground: #1e293b;
+  --secondary: #64748b;
+  --secondary-foreground: #f1f5f9;
+  --muted: #475569;
+  --muted-foreground: #94a3b8;
+  --accent: #06d6a0;
+  --accent-foreground: #0e1420;
+  --destructive: #f87171;
+  --destructive-foreground: #1e293b;
+  --border: #2a3548;
+  --input: #3a4a60;
+  --ring: #06d6a0;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--card);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Focus ring for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px var(--ring) solid;
+  outline-offset: 2px;
+}
+
+/* Reduced animation class */
+.smooth-transition {
+  transition-property: color, background-color, border-color, text-decoration-color, opacity, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
