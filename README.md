@@ -578,3 +578,9 @@ black threaticap/ tests/
 ---
 
 *THREATICAP — Designed for hardening into live defence environments.*
+
+##Team Maverick --
+###D24DCS151 - Vatsal Sapovadiya
+###D24DCS150 - Pratham Jadwani 
+###D24DCS159 - Krunal Mistry 
+###D24DCS156 - Hitanshu Varia 
