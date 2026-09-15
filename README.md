@@ -71,7 +71,7 @@ Multi-source threat correlation, MITRE ATT&CK mapping, mission-aware risk scorin
 
 ## Problem Statement
 
-National and coalition SOC analysts are overwhelmed by alert volume arriving from disconnected SIEM, EDR, satellite/ISR, HUMINT/SIGINT, and STIX/TAXII feeds, and spend the majority of their time triaging noise rather than acting on genuine threats. Existing tooling scores every alert identically regardless of the mission underway, so a high-severity alert hitting a live command-and-control (C2) asset can look no different from one hitting an idle workstation — and by the time the real threat surfaces, the window for effective response has narrowed.
+Defence analysts receive thousands of alerts daily from SIEM systems, satellite feeds, cyber sensors, and intelligence reports — all in different formats. No human team can read them all. Missing a genuine threat is catastrophic; chasing false positives wastes critical resources. Threat assessments must also be produced in structured BLUF (Bottom Line Up Front) format so commanders get a clear picture in minutes.
 
 ---
 
@@ -134,8 +134,6 @@ For the containerised path, see [Running with Docker](#running-with-docker). Ful
 
 | Artifact | Link |
 |---|---|
-| **Demo video** | [Add link — see `demo/demo-video-link.txt`] |
-| **Live demo** | [Add URL, or `NOT DEPLOYED` — see `demo/live-demo-url.txt`] |
 | **Screenshots** | See `demo/screenshots/` (application walkthrough) |
 
 ---
