@@ -43,35 +43,8 @@ THREATICAP addresses the core SOC challenge of **alert fatigue and prioritisatio
 ---
 
 ## Architecture Overview
+<img width="1852" height="839" alt="image" src="https://github.com/user-attachments/assets/6a27343f-6e44-4eab-ac85-76d93134d69b" />
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          THREATICAP                                 │
-│                                                                     │
-│  ┌──────────────┐   ┌─────────────────────────────────────────┐    │
-│  │   FastAPI    │   │           IngestionPipeline             │    │
-│  │   REST API   │   │  ┌──────────┐ ┌───────────┐ ┌───────┐  │    │
-│  │  /api/v1/    │   │  │Normaliser│ │Deduplicator│ │Enrich.│  │    │
-│  └──────┬───────┘   │  └──────────┘ └───────────┘ └───────┘  │    │
-│         │           │         ▲ Connectors                    │    │
-│  ┌──────▼───────────▼──────┐  │  SIEM / EDR / Intel / STIX   │    │
-│  │     ThreatPipeline      │  └─────────────────────────────  │    │
-│  │  (Orchestrator)         │                                   │    │
-│  └─┬────────┬────────┬─────┘                                  │    │
-│    │        │        │                                         │    │
-│    ▼        ▼        ▼                                         │    │
-│  ┌───────┐ ┌──────┐ ┌───────────┐  ┌───────────┐             │    │
-│  │Correl.│ │MITRE │ │Prioritisa-│  │   BLUF    │             │    │
-│  │Engine │ │Mapper│ │tion Engine│  │ Generator │             │    │
-│  └───────┘ └──────┘ └───────────┘  └─────┬─────┘             │    │
-│                                           │                    │    │
-│  ┌────────────────────────────────────────▼──────────────────┐│    │
-│  │                    Storage Layer                          ││    │
-│  │  AlertRepo / ThreatRepo / ReportRepo / AuditRepo          ││    │
-│  │  (In-Memory → SQLite → PostgreSQL — same interface)        ││    │
-│  └───────────────────────────────────────────────────────────┘│    │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 ### Module Map
 
@@ -132,23 +105,8 @@ threaticap/
 ---
 
 ## Data Flow
+<img width="1915" height="354" alt="image" src="https://github.com/user-attachments/assets/a41d1633-780a-4b81-832a-07fc2876c525" />
 
-```
-Source Data                 Ingestion               Correlation
-─────────────               ────────────────        ───────────────────
-SIEM JSON/CEF  ──►  Connector.normalise()  ──►  IOCCorrelator
-EDR telemetry  ──►  AlertNormaliser        ──►  TemporalCorrelator  ──►  CorrelatedThreat
-Intel reports  ──►  AlertDeduplicator      ──►  AssetCorrelator
-STIX/TAXII     ──►  AlertEnricher         ──►  BehaviourCorrelator
-                                           ──►  FPFilter
-
-Correlation           MITRE            Scoring             BLUF
-────────────────      ────────         ──────────────       ──────────────
-CorrelatedThreat ──►  MitreMapper ──►  Prioritisation ──►  BlufGenerator ──►  BlufReport
-                      MitreMapping     Engine                              ──►  AuditRecord
-                      (YAML KB)        PriorityScore
-                                       (5 components)
-```
 
 **Key invariant**: every component receives and returns only canonical model types.
 Raw source data is preserved in `Alert.raw_payload` but never consumed downstream.
