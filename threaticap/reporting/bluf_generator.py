@@ -27,6 +27,7 @@ from threaticap.models.correlated_threat import CorrelatedThreat
 from threaticap.models.mitre import MitreMapping
 from threaticap.models.priority import PriorityScore, PriorityTier
 from threaticap.models.audit import AuditEventType, AuditRecord
+from threaticap.analysis.campaign_reconstructor import CampaignReconstruction
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ class BlufGenerator:
         priority_score: PriorityScore,
         mitre_mapping: MitreMapping,
         alert_lookup: dict[str, Alert] | None = None,
+        campaign: CampaignReconstruction | None = None,
     ) -> BlufReport:
         """
         Generate a BlufReport for a CorrelatedThreat.
@@ -105,6 +107,7 @@ class BlufGenerator:
             priority_score: Priority score with component breakdown.
             mitre_mapping:  Enriched MITRE ATT&CK mapping.
             alert_lookup:   Dict of alert_id → Alert for evidence detail.
+            campaign:       Optional campaign reconstruction (capability 2).
         """
         alert_lookup = alert_lookup or {}
         tier = priority_score.priority_tier
@@ -115,7 +118,10 @@ class BlufGenerator:
         )
         time_window = _format_time_window(threat.min_event_time, threat.max_event_time)
 
-        bottom_line = self._build_bottom_line(threat, priority_score, mitre_mapping, conf_level)
+        bottom_line = self._build_bottom_line(
+            threat, priority_score, mitre_mapping, conf_level,
+            degraded_missions=priority_score.degraded_missions,
+        )
         key_evidence = self._build_key_evidence(threat, alert_lookup)
         immediate_actions = self._build_immediate_actions(tier, mitre_mapping, threat)
         investigation_steps = self._build_investigation_steps(threat, mitre_mapping)
@@ -129,7 +135,7 @@ class BlufGenerator:
         report = BlufReport(
             threat_id=threat.threat_id,
             bottom_line=bottom_line,
-            bottom_line_extended=self._build_extended_summary(threat, mitre_mapping),
+            bottom_line_extended=self._build_extended_summary(threat, mitre_mapping, campaign),
             priority_tier=tier.value,
             priority_score=priority_score.final_score,
             confidence_level=conf_level,
@@ -147,6 +153,13 @@ class BlufGenerator:
             priority_justification=priority_justification,
             score_breakdown=score_breakdown,
             generated_at=datetime.now(timezone.utc),
+            # Mission impact fields
+            mission_impact_multiplier=priority_score.mission_impact_multiplier,
+            degraded_missions=priority_score.degraded_missions,
+            # Campaign reconstruction fields
+            campaign_narrative=campaign.narrative if campaign else "",
+            kill_chain_completion=campaign.kill_chain_completion if campaign else 0.0,
+            adversary_objective=campaign.adversary_objective if campaign else "Unknown",
         )
 
         self._emit_audit(
@@ -172,6 +185,7 @@ class BlufGenerator:
         priority_score: PriorityScore,
         mitre_mapping: MitreMapping,
         conf_level: ConfidenceLevel,
+        degraded_missions: list[str] | None = None,
     ) -> str:
         """
         Construct a 1–3 sentence BLUF bottom line.
@@ -189,15 +203,18 @@ class BlufGenerator:
             f"across {source_str}{tactic_str}."
         )
 
-        # Sentence 2: Evidence summary
+        # Sentence 2: Evidence summary + mission degradation
         asset_str = ""
         if threat.affected_assets:
             n = min(3, len(threat.affected_assets))
             asset_str = f" Affected asset(s): {', '.join(threat.affected_assets[:n])}{'...' if len(threat.affected_assets) > 3 else ''}."
+        mission_str = ""
+        if degraded_missions:
+            mission_str = f" MISSION IMPACT: {', '.join(degraded_missions[:2])} degraded."
 
         sentence2 = (
             f"{threat.alert_count} correlated alert(s) with "
-            f"{conf_level.value.lower()} confidence.{asset_str}"
+            f"{conf_level.value.lower()} confidence.{asset_str}{mission_str}"
         )
 
         # Sentence 3: Action required
@@ -214,7 +231,10 @@ class BlufGenerator:
         return f"{sentence1} {sentence2} {sentence3}"
 
     def _build_extended_summary(
-        self, threat: CorrelatedThreat, mitre_mapping: MitreMapping
+        self,
+        threat: CorrelatedThreat,
+        mitre_mapping: MitreMapping,
+        campaign: "CampaignReconstruction | None" = None,
     ) -> str:
         """Extended context paragraph for analysts."""
         parts = []
@@ -236,6 +256,11 @@ class BlufGenerator:
             parts.append(
                 f"Activity spans network segment(s): {', '.join(threat.network_segments[:3])}."
             )
+        # Campaign reconstruction summary
+        if campaign and campaign.phases_observed:
+            parts.append(campaign.narrative)
+            if campaign.is_advanced_persistent:
+                parts.append("APT-level multi-phase activity detected.")
         return " ".join(parts)
 
     def _build_key_evidence(

@@ -85,5 +85,20 @@ class PriorityScore(BaseModel):
         description="Score reduction applied due to FP probability estimate.",
     )
 
+    # ---- Mission impact (capability 1) ------------------------------------
+    mission_impact_multiplier: float = Field(
+        default=1.0,
+        ge=1.0,
+        le=3.0,
+        description=(
+            "Multiplier applied to asset criticality due to active mission context. "
+            "1.0 = no mission amplification; >1.0 = threat impacts an active mission."
+        ),
+    )
+    degraded_missions: list[str] = Field(
+        default_factory=list,
+        description="Names of active missions assessed as degraded by this threat.",
+    )
+
     scored_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    scoring_version: str = Field(default="1.0")
+    scoring_version: str = Field(default="1.1")

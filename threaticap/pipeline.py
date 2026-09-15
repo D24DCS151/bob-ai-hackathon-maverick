@@ -19,10 +19,13 @@ from threaticap.models.audit import AuditRecord
 from threaticap.models.bluf import BlufReport
 from threaticap.models.correlated_threat import CorrelatedThreat
 from threaticap.models.priority import PriorityScore
+from threaticap.models.mission import MissionContext
 from threaticap.correlation.engine import CorrelationEngine, CorrelationConfig
 from threaticap.mapping.mitre_mapper import MitreMapper
 from threaticap.scoring.prioritisation_engine import PrioritisationEngine, PrioritisationConfig
 from threaticap.reporting.bluf_generator import BlufGenerator
+from threaticap.analysis.campaign_reconstructor import KillChainReconstructor
+from threaticap.intel_quality.feed_quality import FeedQualityManager
 from threaticap.storage.repositories import (
     BaseAlertRepository,
     BaseThreatRepository,
@@ -57,7 +60,8 @@ class PipelineResult:
 class ThreatPipeline:
     """
     Full processing pipeline:
-        Alerts → Correlation → MITRE Mapping → Prioritisation → BLUF Generation
+        Alerts → Feed Quality → Correlation → MITRE Mapping →
+        Campaign Reconstruction → Prioritisation → BLUF Generation
     """
 
     def __init__(
@@ -69,6 +73,8 @@ class ThreatPipeline:
         threat_repo: BaseThreatRepository | None = None,
         audit_repo: BaseAuditRepository | None = None,
         report_repo: BaseReportRepository | None = None,
+        mission_context: MissionContext | None = None,
+        feed_quality_manager: FeedQualityManager | None = None,
     ) -> None:
         # Repositories
         self._alert_repo = alert_repo or InMemoryAlertRepository()
@@ -89,8 +95,11 @@ class ThreatPipeline:
         self._scorer = PrioritisationEngine(
             config=prioritisation_config,
             audit_callback=_audit,
+            mission_context=mission_context,
         )
         self._bluf_gen = BlufGenerator(audit_callback=_audit)
+        self._campaign_reconstructor = KillChainReconstructor()
+        self._feed_quality = feed_quality_manager or FeedQualityManager()
 
     @classmethod
     def from_config_file(cls, config_path: str | Path) -> "ThreatPipeline":
@@ -189,6 +198,9 @@ class ThreatPipeline:
             else:
                 logger.warning("PostgreSQL backend configured but POSTGRES_DSN not set — falling back to memory")
 
+        # ---- Feed quality manager --------------------------------------
+        fq_manager = FeedQualityManager.from_config(cfg)
+
         pipeline = cls(
             correlation_config=corr_config,
             prioritisation_config=prio_config,
@@ -197,6 +209,7 @@ class ThreatPipeline:
             threat_repo=threat_repo,
             audit_repo=audit_repo,
             report_repo=report_repo,
+            feed_quality_manager=fq_manager,
         )
 
         # Load STIX bundle if specified
@@ -204,6 +217,10 @@ class ThreatPipeline:
             pipeline._mapper.load_stix_bundle(Path(stix_bundle_path))
 
         return pipeline
+
+    def update_mission_context(self, ctx: MissionContext) -> None:
+        """Hot-reload mission context without pipeline restart."""
+        self._scorer.update_mission_context(ctx)
 
     def run(self, alerts: list[Alert]) -> PipelineResult:
         """
@@ -215,6 +232,10 @@ class ThreatPipeline:
 
         if not alerts:
             return result
+
+        # ---- Feed quality: record ingest and apply decay ---------------
+        for alert in alerts:
+            self._feed_quality.record_alert_ingested(alert.model_dump(exclude={"raw_payload"}))
 
         # ---- Persist alerts -------------------------------------------
         self._alert_repo.save_batch(alerts)
@@ -228,6 +249,27 @@ class ThreatPipeline:
         for threat in threats:
             # ---- MITRE mapping ----------------------------------------
             mitre_mapping = self._mapper.map_techniques(threat.mitre_technique_ids)
+
+            # ---- Campaign reconstruction (capability 2) ---------------
+            alert_timeline = [
+                {
+                    "alert_id": ev.alert_id,
+                    "event_time": alert_lookup[ev.alert_id].event_time
+                        if ev.alert_id in alert_lookup else None,
+                    "techniques": (
+                        alert_lookup[ev.alert_id].mitre_technique_ids
+                        if ev.alert_id in alert_lookup else []
+                    ),
+                }
+                for ev in threat.evidence_links
+            ]
+            campaign = self._campaign_reconstructor.reconstruct(
+                threat_id=threat.threat_id,
+                mitre_technique_ids=threat.mitre_technique_ids,
+                tactic_names=mitre_mapping.tactic_names,
+                alert_timeline=alert_timeline,
+                suspected_actor=threat.suspected_actor,
+            )
 
             # ---- Prioritisation ---------------------------------------
             score = self._scorer.score(threat, alert_lookup)
@@ -253,6 +295,7 @@ class ThreatPipeline:
                     priority_score=score,
                     mitre_mapping=mitre_mapping,
                     alert_lookup=alert_lookup,
+                    campaign=campaign,
                 )
                 result.reports.append(bluf)
                 result.reports_generated += 1
@@ -307,3 +350,7 @@ class ThreatPipeline:
     @property
     def mitre_mapper(self) -> MitreMapper:
         return self._mapper
+
+    @property
+    def feed_quality(self) -> FeedQualityManager:
+        return self._feed_quality

@@ -31,6 +31,7 @@ from threaticap.models.alert import Alert, AlertSeverity
 from threaticap.models.correlated_threat import CorrelatedThreat
 from threaticap.models.priority import PriorityScore, PriorityTier, ScoreComponent
 from threaticap.models.audit import AuditEventType, AuditRecord
+from threaticap.models.mission import MissionContext
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +95,22 @@ class PrioritisationEngine:
         config: PrioritisationConfig | None = None,
         alert_store: dict[str, Alert] | None = None,
         audit_callback: Callable[[AuditRecord], None] | None = None,
+        mission_context: MissionContext | None = None,
     ) -> None:
         self._config = config or PrioritisationConfig()
         # alert_store: alert_id → Alert (for looking up asset context)
         self._alert_store: dict[str, Alert] = alert_store or {}
         self._audit_callback = audit_callback
+        self._mission_context: MissionContext | None = mission_context
+
+    def update_mission_context(self, ctx: MissionContext) -> None:
+        """Hot-reload mission context without restarting the pipeline."""
+        self._mission_context = ctx
+        logger.info(
+            "Mission context updated: %d mission(s), %d active",
+            len(ctx.missions),
+            len(ctx.get_active_missions()),
+        )
 
     def score(
         self,
@@ -155,16 +167,22 @@ class PrioritisationEngine:
             description=f"Weighted average reliability of contributing sources",
         )
 
-        # ---- Component 4: Asset criticality ----------------------------
+        # ---- Component 4: Asset criticality + mission impact -----------
         crit_raw = self._compute_asset_criticality(constituent_alerts)
+        mission_multiplier, degraded_missions = self._compute_mission_impact(constituent_alerts)
+        mission_adjusted_crit = min(1.0, crit_raw * mission_multiplier)
+        crit_description = f"Max asset criticality across {len(constituent_alerts)} alert(s)"
+        if mission_multiplier > 1.0:
+            crit_description += (
+                f"; mission impact multiplier {mission_multiplier:.2f}×"
+                f" (active missions: {', '.join(degraded_missions[:3])})"
+            )
         criticality_component = ScoreComponent(
             name="Asset Criticality",
-            raw_value=crit_raw,
+            raw_value=mission_adjusted_crit,
             weight=self._config.weights.asset_criticality,
-            weighted_value=crit_raw * self._config.weights.asset_criticality,
-            description=(
-                f"Max asset criticality across {len(constituent_alerts)} alert(s)"
-            ),
+            weighted_value=mission_adjusted_crit * self._config.weights.asset_criticality,
+            description=crit_description,
         )
 
         # ---- Component 5: Temporal urgency ------------------------------
@@ -214,14 +232,16 @@ class PrioritisationEngine:
             severity_score=round(severity_raw, 2),
             confidence_score=round(confidence_raw, 2),
             source_reliability_score=round(rel_raw, 2),
-            asset_criticality_score=round(crit_raw, 2),
+            asset_criticality_score=round(mission_adjusted_crit, 2),
             temporal_urgency_score=round(urgency_raw, 2),
             final_score=round(adjusted_score, 2),
             priority_tier=tier,
             false_positive_adjustment=round(fp_adjustment, 2),
             score_explanation=explanation,
             threshold_used=self._config.thresholds.config_name,
-            scoring_version="1.0",
+            scoring_version="1.1",
+            mission_impact_multiplier=round(mission_multiplier, 3),
+            degraded_missions=degraded_missions,
         )
 
         self._emit_audit(
@@ -304,6 +324,39 @@ class PrioritisationEngine:
         if not alerts:
             return 0.5
         return max(a.asset_context.criticality for a in alerts)
+
+    def _compute_mission_impact(
+        self, alerts: list[Alert]
+    ) -> tuple[float, list[str]]:
+        """
+        Return (mission_impact_multiplier, degraded_mission_names).
+
+        The multiplier is 1.0 when no active mission is affected,
+        and up to 3.0 when a CRITICAL active mission is severely impacted.
+        """
+        if not self._mission_context or not alerts:
+            return 1.0, []
+
+        # Collect all asset identifiers and tags from the alerts
+        asset_ids: list[str] = []
+        asset_tags: list[str] = []
+        max_criticality = 0.0
+
+        for alert in alerts:
+            ac = alert.asset_context
+            if ac.asset_id:
+                asset_ids.append(ac.asset_id)
+            asset_ids.extend(ac.ip_addresses)
+            if ac.hostname:
+                asset_ids.append(ac.hostname)
+            asset_tags.extend(ac.tags)
+            max_criticality = max(max_criticality, ac.criticality)
+
+        multiplier = self._mission_context.get_mission_impact(asset_ids, asset_tags)
+        degraded = self._mission_context.get_degraded_mission_names(
+            asset_ids, asset_tags, max_criticality
+        )
+        return multiplier, degraded
 
     def _compute_temporal_urgency(self, threat: CorrelatedThreat) -> float:
         """

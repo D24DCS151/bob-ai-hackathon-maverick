@@ -24,6 +24,8 @@ def make_alert(
     confidence: float = 0.75,
     threat_actor: str | None = None,
     campaign: str | None = None,
+    rule_id: str | None = None,
+    tlp: str = "TLP:GREEN",
 ) -> Alert:
     if event_time is None:
         event_time = datetime.now(timezone.utc)
@@ -43,6 +45,8 @@ def make_alert(
         source_reliability=source_reliability,
         threat_actor=threat_actor,
         campaign=campaign,
+        rule_id=rule_id,
+        tlp=tlp,
     )
 
 

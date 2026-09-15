@@ -1,4 +1,4 @@
-# THREATICAP Configuration — Phase 2 Production
+# THREATICAP Configuration — Phase 3 Defence SOC Edition
 # All thresholds and parameters are configurable here.
 # No hard-coded values exist in the codebase.
 #
@@ -274,3 +274,140 @@ observability:
 
   # Health check includes enricher circuit states, storage, and streaming
   detailed_health: true
+
+
+# ---------------------------------------------------------------------------
+# Mission Context (Capability 1 — Mission-Aware Prioritisation)
+# ---------------------------------------------------------------------------
+# Mission context can be loaded at startup and hot-reloaded via the API.
+# For production: mount a signed, classified mission context file on the
+# high-side network.  The file is never transmitted externally.
+#
+# mission_context:
+#   context_file: "config/mission_context.yaml"   # Path to mission YAML
+#   hot_reload: true                               # Poll for updates
+#   reload_interval_seconds: 60
+
+mission_context:
+  # Inline missions for development / testing.  Move to a separate
+  # classified file in production.
+  missions:
+    - mission_id: "OPN-GUARDIAN-01"
+      name: "Operation Guardian"
+      classification: "OFFICIAL-SENSITIVE"
+      readiness: "ACTIVE"
+      domain: "CYBER"
+      priority_rank: 1
+      asset_roles:
+        - asset_id: "ASSET-001"
+          mission_id: "OPN-GUARDIAN-01"
+          role: "C2"
+          impact_weight: 2.5
+          degradation_threshold: 0.4
+        - asset_id: "ASSET-002"
+          mission_id: "OPN-GUARDIAN-01"
+          role: "ISR"
+          impact_weight: 2.0
+          degradation_threshold: 0.5
+        - asset_id: "domain-controller"
+          mission_id: "OPN-GUARDIAN-01"
+          role: "COMMS"
+          impact_weight: 1.8
+          degradation_threshold: 0.5
+
+
+# ---------------------------------------------------------------------------
+# Intel Quality Management (Capability 8)
+# ---------------------------------------------------------------------------
+intel_quality:
+  decay:
+    # Indicator confidence halves every N days (radioactive decay model)
+    half_life_days: 30
+    # Minimum confidence floor — indicator never fully expires
+    min_confidence: 0.05
+    # Indicators older than this are automatically retired
+    max_staleness_days: 90
+
+  source_tracking:
+    enabled: true
+    # Minimum analyst verdicts before source weight adjustment kicks in
+    min_samples_for_rating: 10
+    # Exponential moving average smoothing factor (0=no learning, 1=instant)
+    smoothing_alpha: 0.10
+
+  # Persist quality data to disk for air-gapped / no-DB deployments
+  # persist_path: "data/intel_quality.json"
+
+
+# ---------------------------------------------------------------------------
+# Classification & Sharing Policy (Capability 4)
+# ---------------------------------------------------------------------------
+classification:
+  organisation_id: "ORG-001"
+  home_nation: "GBR"
+  default_classification: "OFFICIAL-SENSITIVE"
+  default_tlp: "TLP:AMBER"
+  sources_methods_protection: true
+  redact_ip_addresses: false
+  redact_hostnames: false
+  # Partners for coalition sharing
+  partners: []
+  # Source types that must NEVER be shared externally
+  blocked_source_types:
+    - "HUMINT"
+    - "SIGINT"
+
+
+# ---------------------------------------------------------------------------
+# Cross-Domain & Air-Gapped Operation (Capability 5)
+# ---------------------------------------------------------------------------
+cross_domain:
+  # Current security domain of this deployment
+  # Options: OPEN | LOW | MEDIUM | HIGH | TOP | AIR_GAPPED
+  current_domain: "MEDIUM"
+
+  # Allow high-to-low transfers (downgrade path — requires sanitisation)
+  allow_high_to_low: false
+
+  # Require sanitisation on all cross-domain transfers
+  require_sanitisation: true
+
+  # Export directory for air-gapped transfer packages
+  # export_dir: "data/transfer/outbound"
+
+  # Import directory for incoming transfer packages
+  # import_dir: "data/transfer/inbound"
+
+  # HMAC key for package signing (set via TRANSFER_KEY env var)
+  # NEVER store in this file in production — use a secret management system
+  # transfer_key: ""
+
+
+# ---------------------------------------------------------------------------
+# Integrations — National TIP / MISP / C2 (Capability 6)
+# ---------------------------------------------------------------------------
+integrations:
+  misp:
+    enabled: false
+    url: "https://misp.example.mil"
+    # api_key: ""             # Set via MISP_API_KEY env var
+    verify_ssl: true
+    event_filters:
+      tags: ["tlp:amber", "tlp:red", "tlp:green"]
+      limit: 200
+    push_sightings: true
+    source_reliability: 0.80
+    # cache_path: "data/misp_cache.json"  # fallback for air-gapped ops
+
+  national_tip:
+    enabled: false
+    adapter: "taxii21"        # taxii21 | custom
+    url: "https://tip.example.mil/taxii/"
+    collection_id: ""
+    # api_key: ""             # Set via NATIONAL_TIP_API_KEY env var
+    # username: ""            # Set via NATIONAL_TIP_USERNAME env var
+    # password: ""            # Set via NATIONAL_TIP_PASSWORD env var
+    verify_ssl: true
+    source_reliability: 0.90
+    # Timestamp ISO 8601 — only fetch indicators newer than this
+    # added_after: "2024-01-01T00:00:00Z"

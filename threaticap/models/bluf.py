@@ -108,10 +108,37 @@ class BlufReport(BaseModel):
         description="Component-level score breakdown for transparency.",
     )
 
+    # ---- Mission impact (capability 1) ----------------------------------
+    mission_impact_multiplier: float = Field(
+        default=1.0,
+        description="Mission context amplification factor applied to scoring.",
+    )
+    degraded_missions: list[str] = Field(
+        default_factory=list,
+        description="Active mission(s) assessed as degraded by this threat.",
+    )
+
+    # ---- Campaign reconstruction (capability 2) -------------------------
+    campaign_narrative: str = Field(
+        default="",
+        description="Kill chain reconstruction narrative for commander/analyst context.",
+    )
+    kill_chain_completion: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of the kill chain observed (0=start, 1=impact).",
+    )
+    adversary_objective: str = Field(
+        default="Unknown",
+        description="Assessed adversary objective based on kill chain progression.",
+    )
+
     # ---- Lifecycle ------------------------------------------------------
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     generated_by: str = Field(default="THREATICAP-BLUF-ENGINE")
     analyst_notes: str = Field(default="")
+    schema_version: str = "2.0"
 
     def to_text(self) -> str:
         """
