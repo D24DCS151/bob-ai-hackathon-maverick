@@ -9,29 +9,53 @@
 
 ---
 
+## Screenshots
+
+### Threat Dashboard — MITRE & Kill Chain view
+> Correlated threat queue with live scoring, and the **MITRE ATT&CK technique breakdown panel** for an active APT29/COZY BEAR incident (Score 97.2/100 · 100% confidence · 4 sensor types).
+
+![Threat Dashboard – MITRE & Kill Chain](docs/screenshots/dashboard-mitre-killchain.png)
+
+---
+
+### Swagger API Docs — `localhost:8080/api/v1/docs`
+> Auto-generated **OpenAPI 3.1 interactive documentation** exposing every endpoint — `/api/v1/ingest/alerts`, `/api/v1/pipeline/run`, `/api/v1/threats`, `/api/v1/threats/{threat_id}/bluf` — with authentication requirements and schema details.
+
+![Swagger API Documentation](docs/screenshots/swagger-api-docs.png)
+
+---
+
+### National Defence SOC Dashboard — Commander BLUF view
+> Full SOC dashboard in **NATIONAL DEFENCE CYBER COMMAND** mode showing 6 CRITICAL prioritised threats, 126 correlated multi-source alerts, 100% correlation confidence, and the **Commander BLUF brief** for an active APT29 campaign with unified kill chain progression and a live pipeline completion toast.
+
+![National Defence SOC Dashboard – BLUF](docs/screenshots/dashboard-bluf-national-defence.png)
+
+---
+
 ## Table of Contents
 
-1. [Mission & Capabilities](#mission--capabilities)
-2. [Architecture Overview](#architecture-overview)
-3. [Phase 2 New Components](#phase-2-new-components)
-4. [Data Flow](#data-flow)
-5. [Quick Start — Local Development](#quick-start--local-development)
-6. [Running with Docker Compose](#running-with-docker-compose)
-7. [Authentication & RBAC](#authentication--rbac)
-8. [API Reference](#api-reference)
-9. [Configuration Reference](#configuration-reference)
-10. [MITRE ATT&CK Knowledge Base](#mitre-attck-knowledge-base)
-11. [Streaming Ingestion (Redis Streams)](#streaming-ingestion-redis-streams)
-12. [Graph Correlation](#graph-correlation)
-13. [Enrichment](#enrichment)
-14. [Analyst Feedback](#analyst-feedback)
-15. [Observability](#observability)
-16. [Sample Data & Demo](#sample-data--demo)
-17. [Testing](#testing)
-18. [Extension Points](#extension-points)
-19. [Security & Operational Considerations](#security--operational-considerations)
-20. [Kubernetes Deployment](#kubernetes-deployment)
-21. [Roadmap for Classified Environments](#roadmap-for-classified-environments)
+1. [Screenshots](#screenshots)
+2. [Mission & Capabilities](#mission--capabilities)
+3. [Architecture Overview](#architecture-overview)
+4. [Phase 2 New Components](#phase-2-new-components)
+5. [Data Flow](#data-flow)
+6. [Quick Start — Local Development](#quick-start--local-development)
+7. [Running with Docker Compose](#running-with-docker-compose)
+8. [Authentication & RBAC](#authentication--rbac)
+9. [API Reference](#api-reference)
+10. [Configuration Reference](#configuration-reference)
+11. [MITRE ATT&CK Knowledge Base](#mitre-attck-knowledge-base)
+12. [Streaming Ingestion (Redis Streams)](#streaming-ingestion-redis-streams)
+13. [Graph Correlation](#graph-correlation)
+14. [Enrichment](#enrichment)
+15. [Analyst Feedback](#analyst-feedback)
+16. [Observability](#observability)
+17. [Sample Data & Demo](#sample-data--demo)
+18. [Testing](#testing)
+19. [Extension Points](#extension-points)
+20. [Security & Operational Considerations](#security--operational-considerations)
+21. [Kubernetes Deployment](#kubernetes-deployment)
+22. [Roadmap for Classified Environments](#roadmap-for-classified-environments)
 
 ---
 
